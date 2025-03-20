@@ -134,6 +134,7 @@
             background: #1a1a3d;
             border: 1px solid #00ffcc;
             color: #00ffcc;
+            display: none; /* Ensure hints are hidden by default */
         }
         .mission-label {
             display: flex;
@@ -235,7 +236,7 @@
             <div class="achievements-container">
                 <div class="achievements-header">
                     <h3 style="color:#ff00ff;">Achievements</h3>
-                    <button class="reset-btn" onclick="resetAchievements()">Reset Achievements</button>
+                    <button class="reset-btn" onclick="resetAllProgress()">Reset All Progress</button>
                 </div>
                 <div id="achievements-list">
                     <!-- Achievements will be dynamically added here -->
@@ -827,12 +828,47 @@ EOF</code>
             localStorage.setItem('kubeQuestProgress', JSON.stringify(state));
         }
 
-        // Reset achievements
-        function resetAchievements() {
-            if (confirm("Are you sure you want to reset all achievements? This action cannot be undone.")) {
-                achievements.clear(); // Clear the achievements Set
-                updateAchievements(); // Update the UI to reflect the cleared achievements
-                saveProgress(); // Save the updated state to local storage
+        // Reset all progress
+        function resetAllProgress() {
+            if (confirm("Are you sure you want to reset all progress? This will clear your score, energy, missions, and achievements.")) {
+                // Clear local storage
+                localStorage.removeItem('kubeQuestProgress');
+
+                // Reset achievements
+                achievements.clear();
+
+                // Reset game state
+                energy = 100;
+                document.getElementById('score').textContent = 'Score: 0';
+                document.getElementById('energy').textContent = 'Energy: 100%';
+                document.getElementById('rank').textContent = 'Rank: Cadet';
+                document.getElementById('levelSelector').value = '1';
+
+                // Uncheck all mission checkboxes and hide success messages, hints, and commands
+                document.querySelectorAll('.mission-label input').forEach(checkbox => {
+                    checkbox.checked = false;
+                    const missionId = checkbox.getAttribute('onchange').match(/'[^']+'/)[0].slice(1, -1);
+                    document.getElementById(`success${missionId}`).style.display = 'none';
+                    const commandWrapper = document.getElementById(`command${missionId}`);
+                    const hintDiv = document.getElementById(`hint${missionId}`);
+                    const hintBtn = document.getElementById(`hint-btn-${missionId}`);
+                    if (commandWrapper && hintDiv && hintBtn) {
+                        commandWrapper.style.display = 'none';
+                        hintDiv.style.display = 'none';
+                        hintBtn.textContent = 'Hint';
+                    }
+                });
+
+                // Reset progress bars
+                for (let level = 1; level <= 5; level++) {
+                    document.getElementById(`progress-level${level}`).style.width = '0%';
+                }
+
+                // Update achievements UI
+                updateAchievements();
+
+                // Reset to Level 1
+                changeLevel();
             }
         }
 
@@ -904,6 +940,21 @@ EOF</code>
 
                 updateRank(score);
                 checkAchievements(missionId);
+
+                // Check if the level is complete
+                if (completedMissions === totalMissions) {
+                    const currentLevel = parseInt(level);
+                    if (currentLevel < 5) { // Only prompt if not on the last level
+                        const proceed = confirm(`Congratulations! You've completed Level ${currentLevel}. Do you want to proceed to Level ${currentLevel + 1}?`);
+                        if (proceed) {
+                            const levelSelector = document.getElementById('levelSelector');
+                            levelSelector.value = currentLevel + 1;
+                            changeLevel();
+                        }
+                    } else {
+                        alert("Congratulations! You've completed all levels of KubeQuest!");
+                    }
+                }
             } else {
                 successMsg.style.display = 'none';
                 score -= points;
@@ -979,6 +1030,7 @@ EOF</code>
             const levelSelector = document.getElementById('levelSelector');
             const selectedLevel = levelSelector.value;
 
+            // Show the selected level and hide others
             for (let i = 1; i <= 5; i++) {
                 const levelDiv = document.getElementById(`level${i}`);
                 if (i == selectedLevel) {
@@ -987,6 +1039,25 @@ EOF</code>
                     levelDiv.style.display = 'none';
                 }
             }
+
+            // Reset hints and commands for the selected level (unless mission is complete)
+            const missions = document.querySelectorAll(`#level${selectedLevel} .mission-container`);
+            missions.forEach(mission => {
+                const missionId = mission.querySelector('input[type="checkbox"]').getAttribute('onchange').match(/'[^']+'/)[0].slice(1, -1);
+                const commandWrapper = document.getElementById(`command${missionId}`);
+                const hintDiv = document.getElementById(`hint${missionId}`);
+                const hintBtn = document.getElementById(`hint-btn-${missionId}`);
+                const checkbox = document.querySelector(`input[onchange*="'${missionId}'"]`);
+
+                if (!checkbox.checked) { // Only reset if the mission is not completed
+                    if (commandWrapper && hintDiv && hintBtn) {
+                        commandWrapper.style.display = 'none';
+                        hintDiv.style.display = 'none';
+                        hintBtn.textContent = 'Hint';
+                    }
+                }
+            });
+
             saveProgress();
         }
 
