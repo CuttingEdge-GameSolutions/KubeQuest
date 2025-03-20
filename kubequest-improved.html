@@ -107,7 +107,7 @@
             font-weight: bold;
         }
         .command-wrapper {
-            display: none; /* Hide the terminal command and copy button by default */
+            display: none;
         }
         .command-code {
             display: block;
@@ -118,7 +118,7 @@
             white-space: pre-wrap;
             margin-bottom: 5px;
         }
-        .hint-btn, .copy-btn, .reset-btn, .toggle-btn, .save-btn {
+        .hint-btn, .copy-btn, .reset-btn, .toggle-btn, .save-btn, .music-btn {
             padding: 5px 10px;
             background: #ff00ff;
             color: #0a0a23;
@@ -126,7 +126,7 @@
             cursor: pointer;
             transition: transform 0.1s ease;
         }
-        .hint-btn:hover, .copy-btn:hover, .reset-btn:hover, .toggle-btn:hover, .save-btn:hover {
+        .hint-btn:hover, .copy-btn:hover, .reset-btn:hover, .toggle-btn:hover, .save-btn:hover, .music-btn:hover {
             transform: scale(1.05);
         }
         .pulse-animation {
@@ -269,13 +269,15 @@
                 <div style="text-align:center;margin:10px 0;">
                     <button class="save-btn" onclick="saveProgress()">Save Progress</button>
                 </div>
+                <div style="text-align:center;margin:10px 0;">
+                    <button class="music-btn" onclick="toggleBackgroundMusic()">Toggle Background Music (Off)</button>
+                </div>
                 <div class="sound-toggle">
                     <label for="sound-toggle">Sound Effects:</label>
                     <input type="checkbox" id="sound-toggle" checked onchange="toggleSound()">
                 </div>
             </div>
 
-            <!-- Achievements Section -->
             <div class="achievements-container">
                 <div class="achievements-header">
                     <h3 style="color:#ff00ff;">Recent Achievements</h3>
@@ -289,11 +291,9 @@
                 </div>
             </div>
 
-            <!-- Levels will be dynamically populated here -->
             <div id="levels-container"></div>
         </div>
 
-        <!-- Achievements Page -->
         <div id="achievements-page" class="achievements-page">
             <div class="achievements-page-header">
                 <h2 style="color:#ff00ff;">All Achievements</h2>
@@ -310,8 +310,40 @@
         let achievements = new Set();
         let gameData = null;
         let soundEnabled = true;
+        let backgroundMusic = null;
 
-        // Load game data from JSON
+        function toggleBackgroundMusic() {
+            if (backgroundMusic) {
+                backgroundMusic.pause();
+                backgroundMusic.currentTime = 0;
+                backgroundMusic = null;
+                console.log("Background music stopped.");
+                document.querySelector('.music-btn').textContent = "Toggle Background Music (Off)";
+            } else {
+                if (soundEnabled) {
+                    backgroundMusic = new Audio('background-music.mp3'); // Local file
+                    backgroundMusic.loop = true;
+                    backgroundMusic.volume = 0.5;
+                    backgroundMusic.play()
+                        .then(() => console.log("Background music playing."))
+                        .catch(err => console.error("Background music failed:", err));
+                    document.querySelector('.music-btn').textContent = "Toggle Background Music (On)";
+                } else {
+                    console.log("Sound is disabled; background music not started.");
+                }
+            }
+        }
+
+        function stopBackgroundMusic() {
+            if (backgroundMusic) {
+                backgroundMusic.pause();
+                backgroundMusic.currentTime = 0;
+                backgroundMusic = null;
+                console.log("Background music stopped due to level change.");
+                document.querySelector('.music-btn').textContent = "Toggle Background Music (Off)";
+            }
+        }
+
         async function loadGameData() {
             try {
                 const response = await fetch('gameData.json');
@@ -323,9 +355,7 @@
             }
         }
 
-        // Initialize the game
         function initializeGame() {
-            // Populate level selector
             const levelSelector = document.getElementById('levelSelector');
             gameData.levels.forEach(level => {
                 const option = document.createElement('option');
@@ -334,7 +364,6 @@
                 levelSelector.appendChild(option);
             });
 
-            // Generate levels and missions
             const levelsContainer = document.getElementById('levels-container');
             gameData.levels.forEach(level => {
                 const levelDiv = document.createElement('div');
@@ -393,11 +422,9 @@
                 levelsContainer.appendChild(levelDiv);
             });
 
-            // Load progress after initializing the DOM
             loadProgress();
         }
 
-        // Load progress from local storage
         function loadProgress() {
             const savedState = localStorage.getItem('kubeQuestProgress');
             if (savedState) {
@@ -410,7 +437,6 @@
                 document.getElementById('sound-toggle').checked = state.soundEnabled;
                 soundEnabled = state.soundEnabled;
 
-                // Restore completed missions
                 state.completedMissions.forEach(missionId => {
                     const checkbox = document.querySelector(`input[onchange*="'${missionId}'"]`);
                     if (checkbox) {
@@ -418,7 +444,6 @@
                         document.getElementById(`success${missionId}`).style.display = 'flex';
                         const missionContainer = checkbox.closest('.mission-container');
                         missionContainer.classList.add('completed');
-                        // Also show the command and hint if the mission is completed
                         const commandWrapper = document.getElementById(`command${missionId}`);
                         const hintDiv = document.getElementById(`hint${missionId}`);
                         const hintBtn = document.getElementById(`hint-btn-${missionId}`);
@@ -430,7 +455,6 @@
                     }
                 });
 
-                // Restore progress bars and overview
                 updateProgressOverview();
                 for (let level = 1; level <= gameData.levels.length; level++) {
                     const totalMissions = document.querySelectorAll(`#level${level} .mission-container`).length;
@@ -439,7 +463,6 @@
                     document.getElementById(`progress-level${level}`).style.width = `${progress}%`;
                 }
 
-                // Restore achievements
                 state.achievements.forEach(achievement => achievements.add(achievement));
                 updateAchievements();
             }
@@ -447,7 +470,6 @@
             startEnergyRecharge();
         }
 
-        // Save progress to local storage
         function saveProgress() {
             const state = {
                 score: parseInt(document.getElementById('score').textContent.split(': ')[1]),
@@ -459,26 +481,19 @@
                 soundEnabled: soundEnabled
             };
             localStorage.setItem('kubeQuestProgress', JSON.stringify(state));
-            alert('Progress saved!');
+            console.log("Progress saved!");
         }
 
-        // Reset all progress
         function resetAllProgress() {
             if (confirm("Are you sure you want to reset all progress? This will clear your score, energy, missions, and achievements.")) {
-                // Clear local storage
                 localStorage.removeItem('kubeQuestProgress');
-
-                // Reset achievements
                 achievements.clear();
-
-                // Reset game state
                 energy = 100;
                 document.getElementById('score').textContent = 'Score: 0';
                 document.getElementById('energy').textContent = 'Energy: 100%';
                 document.getElementById('rank').textContent = 'Rank: Cadet';
                 document.getElementById('levelSelector').value = '1';
 
-                // Uncheck all mission checkboxes and hide success messages, hints, and commands
                 document.querySelectorAll('.mission-label input').forEach(checkbox => {
                     checkbox.checked = false;
                     const missionId = checkbox.getAttribute('onchange').match(/'[^']+'/)[0].slice(1, -1);
@@ -495,27 +510,20 @@
                     }
                 });
 
-                // Reset progress bars and overview
                 for (let level = 1; level <= gameData.levels.length; level++) {
                     document.getElementById(`progress-level${level}`).style.width = '0%';
                 }
                 updateProgressOverview();
-
-                // Update achievements UI
                 updateAchievements();
-
-                // Reset to Level 1
                 changeLevel();
             }
         }
 
-        // Energy recharge system
         function startEnergyRecharge() {
             setInterval(() => {
                 if (energy < 100) {
                     energy = Math.min(100, energy + 0.5);
                     document.getElementById('energy').textContent = `Energy: ${Math.round(energy)}%`;
-                    saveProgress();
                 }
             }, 1000);
         }
@@ -525,11 +533,9 @@
                 alert("Not enough energy to reveal a hint! Wait for energy to recharge.");
                 return;
             }
-
             const hintDiv = document.getElementById(hintId);
             const commandWrapper = document.getElementById(commandId);
             const hintBtn = document.getElementById(`hint-btn-${hintId.replace('hint', '')}`);
-            
             if (hintDiv.style.display === "none" || hintDiv.style.display === "") {
                 hintDiv.style.display = "block";
                 commandWrapper.style.display = "block";
@@ -556,14 +562,12 @@
                 checkbox.checked = false;
                 return;
             }
-
             const level = missionId.split('-')[0];
             const progressBar = document.getElementById(`progress-level${level}`);
             const successMsg = document.getElementById(`success${missionId}`);
             const scoreElement = document.getElementById('score');
             const missionContainer = checkbox.closest('.mission-container');
             let score = parseInt(scoreElement.textContent.split(': ')[1]);
-
             if (checkbox.checked) {
                 successMsg.style.display = 'flex';
                 missionContainer.classList.add('completed');
@@ -571,27 +575,27 @@
                 scoreElement.textContent = `Score: ${score}`;
                 energy -= 10;
                 document.getElementById('energy').textContent = `Energy: ${Math.round(energy)}%`;
-
                 if (soundEnabled) {
-                    const audio = new Audio('https://www.myinstants.com/media/sounds/success.mp3'); // Example sound URL
-                    audio.play().catch(err => console.log('Sound playback failed:', err));
+                    const audio = new Audio('success-sound.mp3'); // Local file
+                    audio.loop = false;
+                    audio.volume = 0.7;
+                    audio.play()
+                        .then(() => console.log("Success sound played."))
+                        .catch(err => console.error("Success sound failed:", err));
                 }
-
                 const totalMissions = document.querySelectorAll(`#level${level} .mission-container`).length;
                 const completedMissions = document.querySelectorAll(`#level${level} .mission-label input:checked`).length;
                 const progress = (completedMissions / totalMissions) * 100;
                 progressBar.style.width = `${progress}%`;
-
                 updateProgressOverview();
                 updateRank(score);
                 checkAchievements(missionId);
-
-                // Check if the level is complete
                 if (completedMissions === totalMissions) {
                     const currentLevel = parseInt(level);
                     if (currentLevel < gameData.levels.length) {
                         const proceed = confirm(`Congratulations! You've completed Level ${currentLevel}. Do you want to proceed to Level ${currentLevel + 1}?`);
                         if (proceed) {
+                            stopBackgroundMusic();
                             const levelSelector = document.getElementById('levelSelector');
                             levelSelector.value = currentLevel + 1;
                             changeLevel();
@@ -607,12 +611,10 @@
                 scoreElement.textContent = `Score: ${score}`;
                 energy += 10;
                 document.getElementById('energy').textContent = `Energy: ${Math.round(energy)}%`;
-
                 const totalMissions = document.querySelectorAll(`#level${level} .mission-container`).length;
                 const completedMissions = document.querySelectorAll(`#level${level} .mission-label input:checked`).length;
                 const progress = (completedMissions / totalMissions) * 100;
                 progressBar.style.width = `${progress}%`;
-
                 updateProgressOverview();
                 updateRank(score);
             }
@@ -635,9 +637,7 @@
         }
 
         function checkAchievements(missionId) {
-            const mission = gameData.levels
-                .flatMap(level => level.missions)
-                .find(m => m.id === missionId);
+            const mission = gameData.levels.flatMap(level => level.missions).find(m => m.id === missionId);
             if (mission && mission.achievement && !achievements.has(mission.achievement)) {
                 achievements.add(mission.achievement);
                 updateAchievements();
@@ -660,19 +660,13 @@
             const allAchievementsList = document.getElementById('all-achievements-list');
             achievementsList.innerHTML = '';
             allAchievementsList.innerHTML = '';
-
-            // Sort achievements by recency (newest first)
             const sortedAchievements = Array.from(achievements).reverse();
-
-            // Show all achievements in the Achievements Page
             sortedAchievements.forEach(achievement => {
                 const achievementData = gameData.achievements.find(a => a.id === achievement);
                 if (achievementData) {
                     addAchievement(achievement, achievementData.description, allAchievementsList);
                 }
             });
-
-            // Show only the 3 most recent in the main view
             sortedAchievements.slice(0, 3).forEach(achievement => {
                 const achievementData = gameData.achievements.find(a => a.id === achievement);
                 if (achievementData) {
@@ -700,18 +694,11 @@
         function changeLevel() {
             const levelSelector = document.getElementById('levelSelector');
             const selectedLevel = levelSelector.value;
-
-            // Show the selected level and hide others
+            stopBackgroundMusic();
             for (let i = 1; i <= gameData.levels.length; i++) {
                 const levelDiv = document.getElementById(`level${i}`);
-                if (i == selectedLevel) {
-                    levelDiv.style.display = 'block';
-                } else {
-                    levelDiv.style.display = 'none';
-                }
+                levelDiv.style.display = (i == selectedLevel) ? 'block' : 'none';
             }
-
-            // Reset hints and commands for the selected level (unless mission is complete)
             const missions = document.querySelectorAll(`#level${selectedLevel} .mission-container`);
             missions.forEach(mission => {
                 const missionId = mission.querySelector('input[type="checkbox"]').getAttribute('onchange').match(/'[^']+'/)[0].slice(1, -1);
@@ -719,7 +706,6 @@
                 const hintDiv = document.getElementById(`hint${missionId}`);
                 const hintBtn = document.getElementById(`hint-btn-${missionId}`);
                 const checkbox = document.querySelector(`input[onchange*="'${missionId}'"]`);
-
                 if (!checkbox.checked) {
                     if (commandWrapper && hintDiv && hintBtn) {
                         commandWrapper.style.display = 'none';
@@ -728,16 +714,22 @@
                     }
                 }
             });
-
             saveProgress();
         }
 
         function toggleSound() {
             soundEnabled = document.getElementById('sound-toggle').checked;
+            if (!soundEnabled) {
+                stopBackgroundMusic();
+            } else if (backgroundMusic) {
+                backgroundMusic.play()
+                    .then(() => console.log("Background music resumed."))
+                    .catch(err => console.error("Background music resume failed:", err));
+            }
+            console.log("Sound enabled:", soundEnabled);
             saveProgress();
         }
 
-        // Initialize the game
         window.onload = loadGameData;
     </script>
 </body>
